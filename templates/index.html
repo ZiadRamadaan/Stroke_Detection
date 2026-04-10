@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrokeDetect - AI Stroke Risk Prediction</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}?v=1" type="image/png" sizes="32x32">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}?v=1">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    html, body { height: 100%; margin: 0; }
+    * { font-family: 'DM Sans', sans-serif; }
+    .mono { font-family: 'Space Mono', monospace; }
+    
+    .nav-link { position: relative; cursor: pointer; transition: color 0.2s; }
+    .nav-link.active-nav { color: #1a73e8; font-weight: 600; }
+    .nav-link.active-nav::after { content: ''; position: absolute; bottom: -4px; left: 0; right: 0; height: 2px; background: #1a73e8; border-radius: 1px; }
+    
+    .card-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; transition: box-shadow 0.3s, border-color 0.3s; }
+    .card-section:hover { box-shadow: 0 8px 30px rgba(26, 115, 232, 0.08); border-color: #5a9bf5; }
+    .input-field { width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s; background: #f8fafc; outline: none; }
+    .input-field:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); background: #fff; }
+    .input-field.error { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.1); }
+    .toggle-btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; }
+    .toggle-btn.selected { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .dropdown-wrap { position: relative; }
+    .dropdown-wrap select { appearance: none; -webkit-appearance: none; padding-right: 36px; }
+    .dropdown-wrap::after { content: ''; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #94a3b8; pointer-events: none; }
+    .error-msg { color: #ef4444; font-size: 12px; margin-top: 4px; display: none; }
+    .error-msg.show { display: block; }
+    
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.6s ease-out forwards; }
+    .fade-up-d1 { animation-delay: 0.1s; opacity: 0; }
+    .fade-up-d2 { animation-delay: 0.2s; opacity: 0; }
+    .fade-up-d3 { animation-delay: 0.3s; opacity: 0; }
+    
+    .result-bar { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; }
+    .result-bar-fill { height: 100%; border-radius: 4px; transition: width 1.5s cubic-bezier(0.22,1,0.36,1); }
+    .stat-card { background: linear-gradient(135deg, #e8f0fe, #fff); border: 1px solid #5a9bf5; border-radius: 14px; padding: 24px; text-align: center; }
+    .hero-grid { display: grid; grid-template-columns: 1fr; gap: 40px; align-items: center; min-height: 80vh; justify-content: center; }
+    
+    .page-section { min-height: 100vh; padding-top: 80px; display: flex; flex-direction: column; justify-content: center; }
+        
+    @media (min-width: 768px) { .hero-grid { grid-template-columns: 1fr; gap: 60px; } }
+    @media (max-width: 768px) { .cards-row { flex-direction: column !important; } }
+    .cards-row { display: flex; gap: 24px; }
+    .cards-row > * { flex: 1; min-width: 0; }
+
+    .login-wrapper { position: relative; width: 100%; max-width: 900px; min-height: 550px; background: #fff; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); overflow: hidden; }
+    .form-container { position: absolute; top: 0; height: 100%; transition: all 0.6s ease-in-out; background: #fff; }
+    
+    .sign-in-container { left: 0; width: 50%; z-index: 2; opacity: 1; pointer-events: auto; }
+    .sign-up-container { left: 0; width: 50%; opacity: 0; z-index: 1; pointer-events: none; }
+    
+    .login-wrapper.right-panel-active .sign-in-container { transform: translateX(100%); opacity: 0; pointer-events: none; }
+    .login-wrapper.right-panel-active .sign-up-container { transform: translateX(100%); opacity: 1; z-index: 5; pointer-events: auto; animation: show 0.6s; }
+    
+    @keyframes show { 0%, 49.99% { opacity: 0; z-index: 1; } 50%, 100% { opacity: 1; z-index: 5; } }
+    
+    .overlay-container { position: absolute; top: 0; left: 50%; width: 50%; height: 100%; overflow: hidden; transition: transform 0.6s ease-in-out; z-index: 100; }
+    .login-wrapper.right-panel-active .overlay-container { transform: translateX(-100%); }
+    .overlay { background: linear-gradient(to right, #1e3a8a, #2563eb); background-repeat: no-repeat; background-size: cover; background-position: 0 0; color: #FFFFFF; position: relative; left: -100%; height: 100%; width: 200%; transform: translateX(0); transition: transform 0.6s ease-in-out; }
+    .login-wrapper.right-panel-active .overlay { transform: translateX(50%); }
+    .overlay-panel { position: absolute; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 0 40px; text-align: center; top: 0; height: 100%; width: 50%; transform: translateX(0); transition: transform 0.6s ease-in-out; }
+    .overlay-left { transform: translateX(-20%); }
+    .login-wrapper.right-panel-active .overlay-left { transform: translateX(0); }
+    .overlay-right { right: 0; transform: translateX(0); }
+    .login-wrapper.right-panel-active .overlay-right { transform: translateX(20%); }
+    .social-circle { border: 1px solid #e2e8f0; border-radius: 50%; display: inline-flex; justify-content: center; align-items: center; margin: 0 5px; height: 40px; width: 40px; transition: all 0.3s; cursor: pointer; color: #64748b; }
+    .social-circle:hover { background: #eff6ff; color: #1a73e8; border-color: #1a73e8; }
+    .input-login { background-color: #f8fafc; border: none; padding: 12px 15px; margin: 8px 0; width: 100%; border-radius: 8px; font-size: 14px; outline: none; transition: box-shadow 0.2s; }
+    .input-login:focus { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2); background-color: #fff; }
+    .ghost-btn { background-color: transparent; border-color: #FFFFFF; color: #FFFFFF; cursor: pointer; }
+    .ghost-btn:hover { background-color: rgba(255,255,255,0.1); }
+  </style>
+ </head>
+ <body class="bg-white text-slate-800 overflow-x-hidden"> 
+  
+  <div id="page-login" class="min-h-screen flex items-center justify-center bg-slate-100 fixed inset-0 z-[100] px-4">
+    
+    <div class="login-wrapper shadow-2xl" id="login-container">
+      
+      <div class="form-container sign-up-container flex items-center justify-center px-10">
+        <form id="signup-form" onsubmit="handleSignUp(event)" class="w-full max-w-sm text-center">
+          <h2 class="text-3xl font-bold text-blue-600 mb-4">Create Account</h2>
+          <span class="text-xs text-slate-500 mb-4 block">Use your email for registration:</span>
+          
+          <input type="text" id="signup-name" placeholder="Name" class="input-login" required />
+          <input type="email" id="signup-email" placeholder="Email" class="input-login" required />
+          <input type="password" id="signup-password" placeholder="Password" class="input-login" required />
+          
+          <div id="signup-msg" class="text-xs mt-2 mb-2 hidden"></div>
+          
+          <button type="submit" id="signup-btn" class="mt-4 px-10 py-3 bg-blue-600 text-white font-bold rounded-full uppercase tracking-wider text-sm hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/30">
+            Sign Up
+          </button>
+        </form>
+      </div>
+
+      <div class="form-container sign-in-container flex items-center justify-center px-10 bg-white">
+        <form id="login-form" onsubmit="handleLogin(event)" class="w-full max-w-sm text-center">
+          <div class="absolute top-8 left-8 flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-white">
+            <i data-lucide="brain" style="width:18px;height:18px;color:#2563eb;"></i>
+          </div>
+          <span class="font-bold text-slate-800 text-xl">StrokeDetect</span>
+          </div>
+          <h2 class="text-3xl font-bold text-blue-600 mb-4 mt-2">Sign in to Portal</h2>
+          <span class="text-xs text-slate-500 mb-4 block">Use your email account:</span>
+          
+          <input type="email" id="login-email" placeholder="Email" class="input-login" required />
+          <input type="password" id="login-password" placeholder="Password" class="input-login" required />
+          
+          
+          <div id="login-error" class="text-red-500 text-xs mb-3 hidden"></div>
+          
+          <button type="submit" id="login-btn" class="px-10 py-3 bg-blue-600 text-white font-bold rounded-full uppercase tracking-wider text-sm hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/30">
+            Sign In
+          </button>
+        </form>
+      </div>
+
+      <div class="overlay-container hidden md:block">
+        <div class="overlay">
+          <div class="overlay-panel overlay-left">
+            <h2 class="text-3xl font-bold mb-4">Welcome Back!</h2>
+            <p class="text-sm font-light leading-relaxed mb-8 px-4">To keep connected with us please login with your personal info</p>
+            <button class="ghost-btn px-10 py-3 border-2 font-bold rounded-full uppercase tracking-wider text-sm transition-colors" id="signInGhost">Sign In</button>
+          </div>
+          <div class="overlay-panel overlay-right">
+            <h2 class="text-3xl font-bold mb-4">Hello, Doctor!</h2>
+            <p class="text-sm font-light leading-relaxed mb-8 px-4">Enter your personal details and start your journey with us</p>
+            <button class="ghost-btn px-10 py-3 border-2 font-bold rounded-full uppercase tracking-wider text-sm transition-colors" id="signUpGhost">Sign Up</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    
+    <div class="md:hidden absolute bottom-10 flex gap-4 w-full justify-center px-6">
+       <button id="mobileSignIn" class="px-6 py-2 bg-white text-blue-600 font-bold rounded-full shadow-md text-sm w-1/2 hidden">Go to Sign In</button>
+       <button id="mobileSignUp" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-full shadow-md text-sm w-1/2">Create Account</button>
+    </div>
+
+  </div>
+
+  <div id="main-content" class="w-full hidden">
+    <nav id="main-nav" class="w-full fixed top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="navigateTo('home')">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-white">
+                    <i data-lucide="brain" style="width:20px;height:20px;color:#1a73e8;"></i>
+                </div>
+                <span class="font-extrabold text-slate-800 text-xl tracking-tight" id="nav-title">StrokeDetect</span>
+            </div>
+            
+            <div class="flex items-center gap-6 text-sm font-semibold text-slate-500">
+                <span class="nav-link active-nav hover:text-blue-600 cursor-pointer transition-colors" data-target="page-home" onclick="navigateTo('home')">Home</span> 
+                <span class="nav-link hover:text-blue-600 cursor-pointer transition-colors" data-target="page-predict" onclick="navigateTo('predict')">Predict Risk</span> 
+                <button onclick="logout()" class="ml-2 px-5 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div id="page-home" class="page-section pt-16 relative bg-gradient-to-br from-slate-50 via-blue-50 to-blue-100 overflow-hidden min-h-screen flex items-center w-full">
+        
+        <div class="absolute inset-x-0 bottom-0 top-[14%] z-0">
+        <svg viewBox="0 0 500 150" preserveAspectRatio="none" style="height: 100%; width: 100%; fill: #bfdbfe; opacity: 0.4;">
+            <path d="M-30.70,121.86 C214.73,153.45 271.49,2.48 500.00,49.98 L500.00,150.00 L0.00,150.00 Z" style="stroke: none;"></path>
+        </svg>
+    </div>
+
+        <div class="max-w-7xl mx-auto px-6 py-16 lg:py-24 relative z-10 w-full">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:items-start">
+                
+                <div class="fade-up lg:mt-10">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 border border-blue-200 text-blue-600 text-xs font-bold tracking-wide uppercase mb-6">
+                        Clinical Decision Support
+                    </div>
+                    <h1 id="hero-headline" class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-6">
+                        Proactive <span class="text-blue-600">Stroke Prediction</span> <br class="hidden lg:block"> System
+                    </h1>
+                    <p id="hero-subtitle" class="text-lg text-slate-600 mb-10 max-w-lg leading-relaxed">
+                        Early detection saves lives. By analyzing clinical data and lifestyle factors, our machine learning model identifies at risk patients instantly.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <button onclick="navigateTo('predict')" class="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:-translate-y-1"> 
+                            Start Assessment <i data-lucide="arrow-right" style="width:18px;height:18px;"></i> 
+                        </button>
+                        
+                        <button onclick="document.getElementById('features-section').scrollIntoView({behavior: 'smooth'})" class="inline-flex items-center gap-2 px-8 py-4 bg-white/60 backdrop-blur-md hover:bg-white text-slate-800 font-semibold rounded-xl border border-slate-300 transition-all shadow-sm">
+                            How it Works
+                        </button>
+                    </div>
+                </div>
+
+                <div class="fade-up fade-up-d2 relative lg:ml-10 mt-10 lg:mt-24">
+                <div class="relative rounded-2xl overflow-hidden border border-slate-200 shadow-xl z-10 aspect-[4/3] bg-white p-6">
+                    <img src="{{ url_for('static', filename='background7.jpg') }}" alt="Medical Team" class="w-full h-full object-contain">
+                </div>
+            </div>
+
+            </div>
+        </div>
+    </div>
+
+
+   <div id="page-predict" class="page-section bg-gray-50">
+    <div class="max-w-6xl mx-auto px-6 w-full">
+     <div class="mb-8">
+      <h2 class="text-3xl font-bold text-slate-800">Stroke Risk Assessment</h2>
+      <p class="text-slate-500 text-sm mt-2">Complete all fields below, then click Predict.</p>
+     </div>
+     <form id="predict-form" onsubmit="handlePredict(event)">
+      <div class="cards-row mb-6">
+       <div class="card-section">
+        <div class="flex items-center gap-2 mb-5">
+         <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"><i data-lucide="user" style="width:15px;height:15px;color:#1a73e8;"></i>
+         </div>
+         <h3 class="font-semibold text-slate-800 text-sm">Patient Demographics</h3>
+        </div>
+        <div class="space-y-4">
+         <div>
+          <label for="age" class="block text-xs font-medium text-slate-600 mb-1">Age <span class="text-red-400">*</span></label> <input type="number" id="age" step="0.1" min="0" max="120" placeholder="e.g. 45" class="input-field" required>
+          <div class="error-msg" id="age-err">
+           Please enter a valid age
+          </div>
+         </div>
+         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Gender <span class="text-red-400">*</span></label>
+          <div class="flex gap-2" id="gender-group">
+           <button type="button" class="toggle-btn" data-val="Male" onclick="selectToggle('gender',this)">Male</button> <button type="button" class="toggle-btn" data-val="Female" onclick="selectToggle('gender',this)">Female</button>
+          </div><input type="hidden" id="gender" required>
+          <div class="error-msg" id="gender-err">
+           Please select gender
+          </div>
+         </div>
+         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Ever Married <span class="text-red-400">*</span></label>
+          <div class="flex gap-2" id="married-group">
+           <button type="button" class="toggle-btn" data-val="Yes" onclick="selectToggle('married',this)">Yes</button> <button type="button" class="toggle-btn" data-val="No" onclick="selectToggle('married',this)">No</button>
+          </div><input type="hidden" id="married" required>
+          <div class="error-msg" id="married-err">
+           Please select
+          </div>
+         </div>
+         <div>
+          <label for="work_type" class="block text-xs font-medium text-slate-600 mb-1">Work Type <span class="text-red-400">*</span></label>
+          <div class="dropdown-wrap">
+           <select id="work_type" class="input-field" required> <option value="">Select...</option> <option value="Private">Private</option> <option value="Self-employed">Self-employed</option> <option value="Govt_job">Government Job</option> <option value="children">Children</option> <option value="Never_worked">Never worked</option> </select>
+          </div>
+          <div class="error-msg" id="work_type-err">
+           Please select work type
+          </div>
+         </div>
+         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Residence Type <span class="text-red-400">*</span></label>
+          <div class="flex gap-2" id="residence-group">
+           <button type="button" class="toggle-btn" data-val="Urban" onclick="selectToggle('residence',this)">Urban</button> <button type="button" class="toggle-btn" data-val="Rural" onclick="selectToggle('residence',this)">Rural</button>
+          </div><input type="hidden" id="residence" required>
+          <div class="error-msg" id="residence-err">
+           Please select
+          </div>
+         </div>
+        </div>
+       </div><div class="card-section">
+        <div class="flex items-center gap-2 mb-5">
+         <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"><i data-lucide="heart-pulse" style="width:15px;height:15px;color:#1a73e8;"></i>
+         </div>
+         <h3 class="font-semibold text-slate-800 text-sm">Vitals &amp; Measurements</h3>
+        </div>
+        <div class="space-y-4">
+         <div>
+          <label for="glucose" class="block text-xs font-medium text-slate-600 mb-1">Avg. Glucose Level <span class="text-slate-400">(mg/dL)</span> <span class="text-red-400">*</span></label> <input type="number" id="glucose" step="0.01" min="0" placeholder="e.g. 106.14" class="input-field" required>
+          <div class="error-msg" id="glucose-err">
+           Please enter glucose level
+          </div>
+         </div>
+         <div>
+          <label for="bmi" class="block text-xs font-medium text-slate-600 mb-1">BMI <span class="text-slate-400">(kg/m²)</span> <span class="text-red-400">*</span></label> <input type="number" id="bmi" step="0.1" min="0" max="100" placeholder="e.g. 28.5" class="input-field" required>
+          <div class="error-msg" id="bmi-err">
+           Please enter BMI
+          </div>
+         </div>
+        </div>
+        <div class="mt-8 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
+         <div class="flex items-center gap-2 mb-2">
+          <i data-lucide="info" style="width:14px;height:14px;color:#1a73e8;"></i> <span class="text-xs font-semibold text-blue-700">Reference Ranges</span>
+         </div>
+         <div class="text-xs text-slate-500 space-y-1">
+          <p>Glucose: 70–100 mg/dL (fasting normal)</p>
+          <p>BMI: 18.5–24.9 (normal weight)</p>
+          <p>BMI ≥ 30 indicates obesity</p>
+         </div>
+        </div>
+       </div><div class="card-section">
+        <div class="flex items-center gap-2 mb-5">
+         <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center"><i data-lucide="stethoscope" style="width:15px;height:15px;color:#1a73e8;"></i>
+         </div>
+         <h3 class="font-semibold text-slate-800 text-sm">Medical History &amp; Lifestyle</h3>
+        </div>
+        <div class="space-y-4">
+         <div>
+          <label for="smoking" class="block text-xs font-medium text-slate-600 mb-1">Smoking Status <span class="text-red-400">*</span></label>
+          <div class="dropdown-wrap">
+           <select id="smoking" class="input-field" required> <option value="">Select...</option> <option value="formerly smoked">Formerly smoked</option> <option value="never smoked">Never smoked</option> <option value="smokes">Smokes</option> <option value="Unknown">Unknown</option> </select>
+          </div>
+          <div class="error-msg" id="smoking-err">
+           Please select smoking status
+          </div>
+         </div>
+         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Hypertension <span class="text-red-400">*</span></label>
+          <div class="flex gap-2" id="hypertension-group">
+           <button type="button" class="toggle-btn" data-val="1" onclick="selectToggle('hypertension',this)">Yes</button> <button type="button" class="toggle-btn" data-val="0" onclick="selectToggle('hypertension',this)">No</button>
+          </div><input type="hidden" id="hypertension" required>
+          <div class="error-msg" id="hypertension-err">
+           Please select
+          </div>
+         </div>
+         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Heart Disease <span class="text-red-400">*</span></label>
+          <div class="flex gap-2" id="heart_disease-group">
+           <button type="button" class="toggle-btn" data-val="1" onclick="selectToggle('heart_disease',this)">Yes</button> <button type="button" class="toggle-btn" data-val="0" onclick="selectToggle('heart_disease',this)">No</button>
+          </div><input type="hidden" id="heart_disease" required>
+          <div class="error-msg" id="heart_disease-err">
+           Please select
+          </div>
+         </div>
+        </div>
+       </div>
+      </div><div class="text-center mt-4">
+       <button type="submit" id="predict-btn" class="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all text-sm shadow-lg shadow-blue-600/20"> <i data-lucide="zap" style="width:16px;height:16px;"></i> <span id="predict-btn-text">Predict Stroke Risk</span> </button>
+      </div>
+      <p id="disclaimer-text" class="text-center text-xs text-slate-400 mt-4 max-w-lg mx-auto">⚕️ Note: This prediction is intended as a clinical decision-support tool, not a replacement for professional medical diagnosis.</p>
+     </form>
+     
+     <div id="result-section" class="mt-8 hidden">
+      <div id="result-card" class="bg-white border-2 border-slate-200 rounded-2xl shadow-xl overflow-hidden max-w-4xl mx-auto">
+       <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+         <div class="flex items-center gap-3">
+           <i data-lucide="clipboard-check" style="width:24px;height:24px;color:#1a73e8;"></i>
+           <h3 class="text-lg font-bold text-slate-800">Assessment Result Summary</h3>
+         </div>
+         <span id="result-date" class="text-xs font-medium text-slate-400"></span>
+       </div>
+       
+       <div class="p-6 md:p-8">
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+           
+           <div class="space-y-6">
+             <div>
+               <p class="text-sm font-medium text-slate-500 mb-1">Prediction</p>
+               <div id="result-prediction-badge" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-lg">
+                 </div>
+             </div>
+
+             <div>
+               <div class="flex justify-between items-end mb-2">
+                 <p class="text-sm font-medium text-slate-500">Risk Probability (Confidence)</p>
+                 <span id="result-pct" class="font-bold text-xl text-slate-700 mono"></span>
+               </div>
+               <div class="result-bar h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                 <div id="result-bar-fill" class="h-full rounded-full transition-all duration-1000 ease-out" style="width:0%"></div>
+               </div>
+             </div>
+
+             <div>
+               <p class="text-sm font-medium text-slate-500 mb-1">Risk Level</p>
+               <span id="result-risk-level" class="font-semibold text-slate-800"></span>
+             </div>
+           </div>
+
+           <div class="space-y-6 border-t md:border-t-0 md:border-l border-slate-100 md:pl-8 pt-6 md:pt-0">
+             <div>
+               <p class="text-sm font-semibold text-slate-800 flex items-center gap-2 mb-2">
+                 <i data-lucide="file-text" style="width:16px;height:16px;color:#64748b;"></i> Clinical Description
+               </p>
+               <p id="result-clinical-desc" class="text-sm text-slate-600 leading-relaxed"></p>
+             </div>
+             
+             <div class="bg-blue-50/50 rounded-xl p-4 border border-blue-200">
+               <p class="text-sm font-semibold text-blue-900 flex items-center gap-2 mb-2">
+                 <i data-lucide="shield-check" style="width:16px;height:16px;color:#1a73e8;"></i> Recommendation
+               </p>
+               <p id="result-recommendation" class="text-sm text-blue-800/80 leading-relaxed"></p>
+             </div>
+           </div>
+
+         </div>
+
+         <div class="mt-8 pt-6 border-t border-slate-100">
+            <div id="result-factors"></div>
+         </div>
+
+         <div class="mt-8 text-center">
+           <button onclick="resetForm()" class="inline-flex items-center gap-2 px-6 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"> 
+             <i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Start New Assessment 
+           </button>
+         </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div>
+   <div id="features-section" class="bg-slate-50 py-20 border-b border-slate-200">
+             <div class="max-w-7xl mx-auto px-6">
+                 <div class="text-center max-w-2xl mx-auto mb-16 fade-up">
+                     <h2 class="text-3xl md:text-4xl font-extrabold text-slate-800 mb-4">How the System Works</h2>
+                     <p class="text-slate-600 text-lg leading-relaxed">Predictive Healthcare Analytics. Stroke is a leading cause of death and disability. This project leverages advanced Machine Learning to evaluate medical records and provide accurate, real-time stroke risk predictions.</p>
+                 </div>
+
+                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                     
+                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 fade-up">
+                         <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mb-5 text-blue-600">
+                             <i data-lucide="activity"></i>
+                         </div>
+                         <h3 class="font-bold text-slate-800 text-lg mb-2">15 Clinical Features</h3>
+                         <p class="text-sm text-slate-600 leading-relaxed">Analyzes key indicators like BMI, Glucose levels, Hypertension, and smoking status.</p>
+                     </div>
+
+                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 fade-up" style="transition-delay: 100ms;">
+                         <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mb-5 text-green-600">
+                             <i data-lucide="target"></i>
+                         </div>
+                         <h3 class="font-bold text-slate-800 text-lg mb-2">High Accuracy</h3>
+                         <p class="text-sm text-slate-600 leading-relaxed">Achieved 84% Accuracy & 82% ROC-AUC using an optimized Ensemble Model.</p>
+                     </div>
+
+                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 fade-up" style="transition-delay: 200ms;">
+                         <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center mb-5 text-purple-600">
+                             <i data-lucide="bar-chart-2"></i>
+                         </div>
+                         <h3 class="font-bold text-slate-800 text-lg mb-2">Data Balancing</h3>
+                         <p class="text-sm text-slate-600 leading-relaxed">Implemented BorderlineSMOTE technique to handle severe class imbalance effectively.</p>
+                     </div>
+
+                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 fade-up" style="transition-delay: 300ms;">
+                         <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center mb-5 text-orange-600">
+                             <i data-lucide="zap"></i>
+                         </div>
+                         <h3 class="font-bold text-slate-800 text-lg mb-2">Real-time Inference</h3>
+                         <p class="text-sm text-slate-600 leading-relaxed">Instantaneous risk scoring interface designed for clinical decision support.</p>
+                     </div>
+
+                 </div>
+             </div>
+         </div>
+
+
+   <footer class="w-full px-6 py-6 border-t border-slate-700 bg-slate-900">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-sm text-slate-300 gap-5 md:gap-0">
+        
+        <div class="flex items-center gap-4 z-10 w-full md:w-auto justify-center md:justify-start">
+         <div class="w-10 h-10 rounded-full bg-blue-900/30 flex items-center justify-center text-blue-400 border border-blue-700">
+           <i data-lucide="code-2" style="width:18px;height:18px;"></i>
+         </div>
+         <div class="text-center md:text-left">
+           <p class="text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-0.5">Developed By</p>
+           <h3 class="font-semibold text-white text-sm">Basmala Hussien</h3>
+           <p class="text-[10px] text-slate-500 mt-0.5">Computer Science Dept</p> </div>
+       </div>
+
+       <div class="flex items-center gap-4 z-10 w-full md:w-auto justify-center md:justify-end">
+        <div class="text-center md:text-right">
+         <p class="text-[10px] text-blue-400 uppercase tracking-wider font-medium mb-0.5">Graduation Project For</p>
+         <h3 class="font-medium text-white text-sm">Arab Open University - AOU</h3>
+         <p class="text-[10px] text-slate-400 mt-0.5">Supervised by: Dr. Asmaa Fawzy</p> </div>
+        
+        <div class="w-12 h-12 flex-shrink-0 bg-white rounded-lg border border-slate-100 shadow-sm p-1 flex items-center justify-center">
+         <img src="https://www.aou.edu.eg/assets/common/images/logo-ar.png" alt="AOU Logo" class="max-w-full max-h-full object-contain">
+        </div>
+       </div>
+
+    </div>
+   </footer>
+
+  </div>
+  <script>
+    // --- LOGIN LOGIC ---
+    // --- LOGIN & REGISTER LOGIC ---
+    const loginContainer = document.getElementById('login-container');
+    const signUpGhost = document.getElementById('signUpGhost');
+    const signInGhost = document.getElementById('signInGhost');
+    const mobileSignUp = document.getElementById('mobileSignUp');
+    const mobileSignIn = document.getElementById('mobileSignIn');
+
+    // Animations toggle
+    signUpGhost.addEventListener('click', () => { loginContainer.classList.add("right-panel-active"); });
+    signInGhost.addEventListener('click', () => { loginContainer.classList.remove("right-panel-active"); });
+    
+    mobileSignUp.addEventListener('click', () => { 
+        loginContainer.classList.add("right-panel-active"); 
+        mobileSignUp.classList.add("hidden");
+        mobileSignIn.classList.remove("hidden");
+    });
+    mobileSignIn.addEventListener('click', () => { 
+        loginContainer.classList.remove("right-panel-active"); 
+        mobileSignIn.classList.add("hidden");
+        mobileSignUp.classList.remove("hidden");
+    });
+
+    // Handle Sign Up
+    function handleSignUp(e) {
+      e.preventDefault();
+      const name = document.getElementById('signup-name').value;
+      const email = document.getElementById('signup-email').value;
+      const password = document.getElementById('signup-password').value;
+      const msgBox = document.getElementById('signup-msg');
+      const btn = document.getElementById('signup-btn');
+
+      btn.textContent = 'Creating...';
+      btn.disabled = true;
+
+      fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        msgBox.classList.remove('hidden', 'text-red-500', 'text-emerald-500');
+        if (data.status === 'success') {
+          msgBox.textContent = data.message;
+          msgBox.classList.add('block', 'text-emerald-500');
+          // Slide to login automatically after success
+          setTimeout(() => {
+              document.getElementById('login-email').value = email;
+              loginContainer.classList.remove("right-panel-active");
+          }, 1500);
+        } else {
+          msgBox.textContent = data.message;
+          msgBox.classList.add('block', 'text-red-500');
+        }
+      })
+      .catch(err => {
+        msgBox.textContent = 'Server connection failed.';
+        msgBox.classList.remove('hidden');
+        msgBox.classList.add('block', 'text-red-500');
+      })
+      .finally(() => {
+        btn.textContent = 'Sign Up';
+        btn.disabled = false;
+      });
+    }
+
+    // Handle Sign In
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const errorMsg = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      btn.textContent = 'Authenticating...';
+      btn.disabled = true;
+
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        errorMsg.classList.remove('hidden', 'block');
+        if (data.status === 'success') {
+          document.getElementById('page-login').classList.add('hidden');
+          document.getElementById('main-content').classList.remove('hidden');
+          window.scrollTo(0,0);
+        } else {
+          errorMsg.textContent = data.message;
+          errorMsg.classList.add('block');
+        }
+      })
+      .catch(err => {
+        errorMsg.textContent = 'Server connection failed.';
+        errorMsg.classList.add('block');
+      })
+      .finally(() => {
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+      });
+    }
+
+    function logout() {
+      document.getElementById('main-content').classList.add('hidden');
+      document.getElementById('page-login').classList.remove('hidden');
+      document.getElementById('login-form').reset();
+      document.getElementById('signup-form').reset();
+      loginContainer.classList.remove("right-panel-active"); // Reset slider
+    }
+
+    // --- SCROLL NAVIGATION LOGIC ---
+    function navigateTo(pageId) {
+      const section = document.getElementById('page-' + pageId);
+      if(section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Highlight active nav link on scroll
+    const sections = document.querySelectorAll('.page-section');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            if (pageYOffset >= (sectionTop - sectionHeight / 3)) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active-nav');
+            if (link.dataset.target === current) {
+                link.classList.add('active-nav');
+            }
+        });
+    });
+
+    // --- TOGGLE BUTTONS ---
+    function selectToggle(name, btn) {
+      const group = btn.parentElement;
+      group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      document.getElementById(name).value = btn.dataset.val;
+      document.getElementById(name + '-err').classList.remove('show');
+    }
+
+    // --- VALIDATION & PREDICT ---
+    function handlePredict(e) {
+      e.preventDefault();
+      let valid = true;
+      const fields = ['age', 'gender', 'married', 'work_type', 'residence', 'glucose', 'bmi', 'smoking', 'hypertension', 'heart_disease'];
+      
+      fields.forEach(f => {
+        const errEl = document.getElementById(f + '-err');
+        if (errEl) errEl.classList.remove('show');
+        const inp = document.getElementById(f);
+        if (inp) inp.classList.remove('error');
+      });
+
+      fields.forEach(f => {
+        const inp = document.getElementById(f);
+        if (!inp.value || inp.value.trim() === '') {
+          valid = false;
+          const errEl = document.getElementById(f + '-err');
+          if (errEl) errEl.classList.add('show');
+          if (inp.type !== 'hidden') inp.classList.add('error');
+        }
+      });
+
+      if (!valid) return;
+
+      const data = {
+        age: parseFloat(document.getElementById('age').value),
+        gender: document.getElementById('gender').value,
+        ever_married: document.getElementById('married').value,
+        work_type: document.getElementById('work_type').value,
+        Residence_type: document.getElementById('residence').value, 
+        avg_glucose_level: parseFloat(document.getElementById('glucose').value),
+        bmi: parseFloat(document.getElementById('bmi').value),
+        smoking_status: document.getElementById('smoking').value,
+        hypertension: parseInt(document.getElementById('hypertension').value),
+        heart_disease: parseInt(document.getElementById('heart_disease').value)
+      };
+
+      document.getElementById('predict-btn-text').textContent = 'Analyzing...';
+      document.getElementById('predict-btn').disabled = true;
+
+      fetch('/api/predict', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(result => {
+          if(result.error) {
+              alert("Error: " + result.error);
+          } else {
+              showResult(result.risk_percentage, data);
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          alert("Failed to connect to the prediction server.");
+      })
+      .finally(() => {
+          document.getElementById('predict-btn-text').textContent = 'Predict Stroke Risk';
+          document.getElementById('predict-btn').disabled = false;
+      });
+    }
+
+    function showResult(risk, data) {
+    const section = document.getElementById('result-section');
+    const resultCard = document.getElementById('result-card');
+    section.classList.remove('hidden');
+
+    const dateOptions = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    document.getElementById('result-date').textContent = new Date().toLocaleDateString('en-US', dateOptions);
+
+    const yOffset = -80;
+    const y = section.getBoundingClientRect().top + window.pageYOffset + yOffset;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+
+    const isHigh = risk >= 15; 
+    const isMod = risk >= 2.5 && risk < 15; 
+
+    const colorClass = isHigh ? 'text-red-700' : isMod ? 'text-orange-600' : 'text-green-700';
+    const bgClass = isHigh ? 'bg-red-50' : isMod ? 'bg-orange-50' : 'bg-green-50';
+    const barColor = isHigh ? '#b91c1c' : isMod ? '#ea580c' : '#15803d';
+    const borderColor = isHigh ? '#b91c1c' : isMod ? '#f97316' : '#15803d';
+
+    const predictionText = isHigh ? 'Clinical Alert: High Stroke Probability' : 
+                          isMod ? 'Moderate Clinical Suspicion' : 
+                          'Low Clinical Risk Profile';
+                          
+    const riskLevelText = isHigh ? 'Critical' : isMod ? 'Elevated' : 'Stable';
+    const icon = isHigh ? 'alert-triangle' : isMod ? 'alert-circle' : 'check-circle';
+
+    resultCard.style.borderColor = borderColor;
+    const badge = document.getElementById('result-prediction-badge');
+    badge.className = `inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm ${bgClass} ${colorClass} border border-current`;
+    badge.innerHTML = `<i data-lucide="${icon}" style="width:18px;height:18px;"></i> ${predictionText}`;
+
+    document.getElementById('result-pct').textContent = risk.toFixed(2) + '%';
+    const barFill = document.getElementById('result-bar-fill');
+    barFill.style.width = '0%';
+    barFill.style.backgroundColor = barColor;
+    requestAnimationFrame(() => { barFill.style.width = risk + '%'; });
+
+    const riskLevelEl = document.getElementById('result-risk-level');
+    riskLevelEl.textContent = riskLevelText;
+    riskLevelEl.className = `font-extrabold ${colorClass}`;
+
+    const article = riskLevelText.toLowerCase().startsWith('e') ? 'an' : 'a';
+    let clinicalDesc = `Integrated AI diagnostics indicate ${article} ${riskLevelText.toLowerCase()} risk profile. `;
+    let riskFactors = [];
+    if (data.age > 60) riskFactors.push("Advanced Age (60+)");
+    if (data.hypertension === 1) riskFactors.push("Chronic Hypertension");
+    if (data.heart_disease === 1) riskFactors.push("Established Cardiovascular Disease");
+    if (data.avg_glucose_level > 140) riskFactors.push("Hyperglycemic Tendencies");
+    if (data.bmi > 30) riskFactors.push("Obesity Metrics (High BMI)");
+    if (data.smoking_status === 'smokes') riskFactors.push("Active Nicotine Consumption");
+
+    if (riskFactors.length > 0) {
+        clinicalDesc += `This assessment is primarily driven by the following synergistic factors: ${riskFactors.join(', ')}.`;
+    } else {
+        clinicalDesc += `No significant pathological indicators were flagged in the provided dataset.`;
+    }
+    document.getElementById('result-clinical-desc').textContent = clinicalDesc;
+
+    let recommendation = "";
+    if (isHigh) {
+        recommendation = "Action Required: Immediate neuro-consultation is advised. Consider specialized imaging (MRI/CT Angiography) and aggressive prophylactic management of modifiable risk factors.";
+    } else if (isMod) {
+        recommendation = "Monitoring Plan: Schedule a follow-up cardiovascular screening. Implement proactive lifestyle optimization and monitor blood pressure/glucose stability.";
+    } else {
+        recommendation = "Observation: Maintain routine annual screenings. Patient currently aligns with the stable baseline for this demographic.";
+    }
+    document.getElementById('result-recommendation').textContent = recommendation;
+
+    const factorsEl = document.getElementById('result-factors');
+    if (riskFactors.length > 0) {
+        factorsEl.innerHTML = `
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Identified Clinical Risk Markers</p>
+            <div class="flex flex-wrap gap-2">
+                ${riskFactors.map(factor => `
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                        ${factor}
+                    </span>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        factorsEl.innerHTML = `<p class="text-xs text-slate-400 italic">No primary risk markers identified.</p>`;
+    }
+
+    lucide.createIcons();
+}
+
+    function resetForm() {
+      document.getElementById('predict-form').reset();
+      document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('[type="hidden"]').forEach(h => h.value = '');
+      document.getElementById('result-section').classList.add('hidden');
+      navigateTo('predict');
+    }
+
+    // Initialize icons
+    lucide.createIcons();
+  </script>
+ </body>
+</html>
